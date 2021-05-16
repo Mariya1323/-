@@ -1,0 +1,75 @@
+import requests
+import re
+import os
+from scipy.special import spherical_jn, spherical_yn
+from math import pi
+
+TASK_NAME = os.path.basename(__file__)[:os.path.basename(__file__).rfind('.')]
+URL = 'https://jenyay.net/uploads/Student/Modelling/task_02_01.txt'
+
+VALUE_RE = r'\d+[e\.]?\-?\d+e?\d*'
+D_GROUP_RE = f'(?P<D>(?<=D\\=){VALUE_RE})'
+FMIN_GROUP_RE = f'(?P<fmin>(?<=fmin\\=){VALUE_RE})'
+FMAX_GROUP_RE = f'(?P<fmax>(?<=fmax\\=){VALUE_RE})'
+# тест выражения https://regex101.com/r/uJ2yDD/1
+FULL_RE = f'{D_GROUP_RE}|{FMIN_GROUP_RE}|{FMAX_GROUP_RE}'
+
+LIGHT_SPEED = 3 * 10 ** 8
+
+
+def download_file(url, no_cache=False) -> str:
+    try:
+        if no_cache:
+            raise FileNotFoundError
+        with open(TASK_NAME + '.cache') as file:
+            return file.read()
+    except FileNotFoundError:
+        result = requests.get(url)
+        data = result.content.decode('utf-8')
+        if not no_cache:
+            with open(TASK_NAME + '.cache', 'w') as file:
+                file.write(data)
+        return data
+
+
+def parse_data(data: str) -> dict:
+    out = {'D': [], 'fmin': [], 'fmax': []}
+    for result in re.finditer(re.compile(FULL_RE), data):
+        result_data = result.groupdict()
+        for key in result_data:
+            if result_data[key] is not None:
+                out[key].append(float(result_data[key]))
+    return out
+
+
+def phi_to_lambda(phi):
+    return LIGHT_SPEED / phi
+
+
+def sigma(lambda_, k, r, n_end):
+    kr = k * r
+    return (lambda_ ** 2 / pi) \
+           * abs(sum((-1) ** n * (n + .5) * (b_n(n, kr) - a_n(n, kr))
+                     for n in range(1, n_end + 1))) ** 2
+
+
+def a_n(n, kr):
+    return spherical_jn(n, kr) / bessel_h_n(n, kr)
+
+
+def b_n(n, kr):
+    return (kr * spherical_jn(n - 1, kr) - n * spherical_jn(n, kr)) \
+           / (kr * bessel_h_n(n - 1, kr) - n * bessel_h_n(n, kr))
+
+
+def bessel_h_n(n, value):
+    return spherical_jn(n, value) + spherical_yn(n, value) * 1j
+
+
+if __name__ == '__main__':
+    dat = download_file(URL)
+    task = parse_data(dat)
+    for diameter in task['D']:
+        radius = diameter / 2
+    print(parse_data(dat))
+    
